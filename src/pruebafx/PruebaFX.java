@@ -1,143 +1,123 @@
 package pruebafx;
 
-
 import javafx.application.Application;
-import javafx.fxml.FXMLLoader;
-import javafx.scene.Parent;
 import javafx.scene.Scene;
 import javafx.stage.Stage;
-
-import javafx.scene.control.Button;
-import javafx.scene.control.TextArea;
+import javafx.scene.control.*;
 import javafx.scene.layout.VBox;
+import javafx.geometry.Pos;
 import java.sql.*;
+import javafx.scene.control.cell.PropertyValueFactory;
+import javafx.collections.FXCollections;
+import javafx.collections.ObservableList;
 
 public class PruebaFX extends Application {
 
     private final String URL = "jdbc:mysql://localhost:3306/empresa_construccion";
     private final String USER = "root";
-    private final String PASS = "";
-    
-    private TextArea txtResultado;
-    
+    private final String PASS = ""; 
+
+    private TableView tablaGenerica; // Tabla que cambia de contenido
+
     @Override
     public void start(Stage stage) {
-        txtResultado = new TextArea();
-        txtResultado.setEditable(false);
-        txtResultado.setPrefHeight(400);
-        txtResultado.setStyle("-fx-font-family: 'Courier New';"); // Fuente monoespaciada para mejor orden
+        tablaGenerica = new TableView<>();
+        tablaGenerica.setColumnResizePolicy(TableView.CONSTRAINED_RESIZE_POLICY);
 
-        Button btnA = new Button("A. Vehículos más nuevos");
-        Button btnB = new Button("B. Técnicos por contacto");
-        Button btnC = new Button("C. Reporte de Revisiones");
+        Button btnA = new Button("3 Vehículos Más Nuevos");
+        Button btnB = new Button("Técnicos Ordenados por Descendentemente");
+        Button btnC = new Button("Reporte de Revisiones");
 
-        btnA.setMaxWidth(Double.MAX_VALUE);
-        btnB.setMaxWidth(Double.MAX_VALUE);
-        btnC.setMaxWidth(Double.MAX_VALUE);
+        String estilo = "-fx-background-color: #4a90e2; -fx-text-fill: white; -fx-font-weight: bold; -fx-background-radius: 10;";
+        btnA.setStyle(estilo); btnB.setStyle(estilo); btnC.setStyle(estilo);
+        btnA.prefWidthProperty().bind(stage.widthProperty().divide(2));
+        btnB.prefWidthProperty().bind(stage.widthProperty().divide(2));
+        btnC.prefWidthProperty().bind(stage.widthProperty().divide(2));
 
-        // Eventos
-        btnA.setOnAction(e -> mostrarVehiculosNuevos());
-        btnB.setOnAction(e -> mostrarTecnicosDesc());
-        btnC.setOnAction(e -> mostrarReporteRevisiones());
+        
+        btnA.setOnAction(e -> resolverPuntoA());
+        btnB.setOnAction(e -> resolverPuntoB());
+        btnC.setOnAction(e -> resolverPuntoC());
 
-        VBox root = new VBox(10, btnA, btnB, btnC, txtResultado);
-        root.setStyle("-fx-padding: 20; -fx-background-color: #f4f4f4;");
+        VBox root = new VBox(15, btnA, btnB, btnC, tablaGenerica);
+        root.setAlignment(Pos.TOP_CENTER);
+        root.setStyle("-fx-padding: 20;");
 
-        Scene scene = new Scene(root, 700, 550);
-        stage.setTitle("Panel de Control - Empresa de Construcción (MySQL)");
+        Scene scene = new Scene(root, 800, 600);
         stage.setScene(scene);
+        stage.setTitle("Sistema de Construcción");
         stage.show();
     }
 
-    // MÉTODOS DE CONSULTA
-    
-    public void mostrarVehiculosNuevos() {
-        txtResultado.clear();
-        // Probamos con una consulta más amplia para descartar fallos del LIMIT
-        String sql = "SELECT placa, odometro, modelo FROM vehiculo ORDER BY odometro ASC";
+    private void resolverPuntoA() {
+        tablaGenerica.getColumns().clear();
+        TableColumn<Vehiculo, String> c1 = new TableColumn<>("Placa");
+        c1.setCellValueFactory(new PropertyValueFactory<>("placa"));
+        TableColumn<Vehiculo, Double> c2 = new TableColumn<>("Odómetro");
+        c2.setCellValueFactory(new PropertyValueFactory<>("odometro"));
+        tablaGenerica.getColumns().addAll(c1, c2);
 
+        ObservableList<Vehiculo> datos = FXCollections.observableArrayList();
+        String sql = "SELECT * FROM vehiculo ORDER BY odometro ASC LIMIT 3";
         try (Connection con = DriverManager.getConnection(URL, USER, PASS);
-             PreparedStatement ps = con.prepareStatement(sql);
-             ResultSet rs = ps.executeQuery()) {
-
-            txtResultado.appendText("--- LISTADO DE VEHÍCULOS ---\n");
-
-            int contador = 0;
+             Statement st = con.createStatement(); ResultSet rs = st.executeQuery(sql)) {
             while (rs.next()) {
-                // Usamos índices: 1 es placa, 2 es odometro, 3 es modelo
-                String placa = rs.getString(1); 
-                String odo = rs.getString(2);
-                String mod = rs.getString(3);
-
-                txtResultado.appendText(placa + " | " + mod + " | " + odo + "\n");
-                contador++;
+                datos.add(new Vehiculo(rs.getString("placa"), rs.getDouble("odometro"), rs.getString("modelo"), rs.getString("tipo")));
             }
-
-            if (contador == 0) {
-                txtResultado.appendText("La base de datos respondió, pero la tabla está VACÍA.");
-            }
-
-        } catch (SQLException e) {
-            txtResultado.setText("ERROR DE SQL: " + e.getMessage());
-        }
+            tablaGenerica.setItems(datos);
+        } catch (SQLException ex) { System.out.println(ex.getMessage()); }
     }
 
-    public void mostrarTecnicosDesc() {
-        txtResultado.clear();
-        String sql = "SELECT * FROM tecnico ORDER BY contacto DESC";
-        ejecutarConsulta(sql, "--- TÉCNICOS ORDENADOS POR CONTACTO (DESC) ---");
+    private void resolverPuntoB() {
+        tablaGenerica.getColumns().clear();
+        TableColumn<Tecnico, String> c1 = new TableColumn<>("Nombre Completo");
+        c1.setCellValueFactory(new PropertyValueFactory<>("nombreCompleto"));
+        TableColumn<Tecnico, Integer> c2 = new TableColumn<>("Contacto");
+        c2.setCellValueFactory(new PropertyValueFactory<>("contacto"));
+        tablaGenerica.getColumns().addAll(c1, c2);
+
+        ObservableList<Tecnico> datos = FXCollections.observableArrayList();
+        String sql = "SELECT nombre, apellido, contacto FROM tecnico ORDER BY contacto DESC";
+        try (Connection con = DriverManager.getConnection(URL, USER, PASS);
+             Statement st = con.createStatement(); ResultSet rs = st.executeQuery(sql)) {
+            while (rs.next()) {
+                datos.add(new Tecnico(rs.getString("nombre"), rs.getString("apellido"), rs.getInt("contacto")));
+            }
+            tablaGenerica.setItems(datos);
+        } catch (SQLException ex) { System.out.println(ex.getMessage()); }
     }
 
-    public void mostrarReporteRevisiones() {
-        txtResultado.clear();
-        // MySQL usa CONCAT() para unir textos
-        String sql = "SELECT r.id, CONCAT(t.nombre, ' ', t.apellido) as tecnico, " +
-                     "v.placa, v.tipo, CONCAT(o.nombre, ' ', o.apellido) as operador, " +
-                     "r.fecha_revision FROM revision r " +
+    // --- PUNTO C: Reporte de Revisiones ---
+    private void resolverPuntoC() {
+        tablaGenerica.getColumns().clear();
+        TableColumn<Reporte, Integer> c1 = new TableColumn<>("ID");
+        c1.setCellValueFactory(new PropertyValueFactory<>("id"));
+        TableColumn<Reporte, String> c2 = new TableColumn<>("Técnico");
+        c2.setCellValueFactory(new PropertyValueFactory<>("tecnico"));
+        TableColumn<Reporte, String> c3 = new TableColumn<>("Vehículo");
+        c3.setCellValueFactory(new PropertyValueFactory<>("vehiculo"));
+        TableColumn<Reporte, String> c4 = new TableColumn<>("Operador");
+        c4.setCellValueFactory(new PropertyValueFactory<>("operador"));
+        TableColumn<Reporte, String> c5 = new TableColumn<>("Fecha");
+        c5.setCellValueFactory(new PropertyValueFactory<>("fecha"));
+        tablaGenerica.getColumns().addAll(c1, c2, c3, c4, c5);
+
+        ObservableList<Reporte> datos = FXCollections.observableArrayList();
+        String sql = "SELECT r.id, CONCAT(t.nombre, ' ', t.apellido) as tec, " +
+                     "v.placa, v.tipo, CONCAT(o.nombre, ' ', o.apellido) as ope, r.fecha_revision " +
+                     "FROM revision r " +
                      "JOIN tecnico t ON r.encargado = t.id " +
                      "JOIN vehiculo v ON r.vehiculo = v.placa " +
                      "JOIN operador o ON r.chofer = o.id";
-        
         try (Connection con = DriverManager.getConnection(URL, USER, PASS);
-             PreparedStatement ps = con.prepareStatement(sql);
-             ResultSet rs = ps.executeQuery()) {
-            
-            txtResultado.appendText("--- REPORTE DETALLADO DE REVISIONES ---\n");
-            txtResultado.appendText(String.format("%-5s | %-20s | %-10s | %-15s | %-10s\n", "ID", "TÉCNICO", "PLACA", "OPERADOR", "FECHA"));
-            txtResultado.appendText("----------------------------------------------------------------------\n");
-            
+             Statement st = con.createStatement(); ResultSet rs = st.executeQuery(sql)) {
             while (rs.next()) {
-                txtResultado.appendText(String.format("%-5d | %-20s | %-10s | %-15s | %-10s\n",
-                    rs.getInt("id"), rs.getString("tecnico"), rs.getString("placa"), 
-                    rs.getString("operador"), rs.getDate("fecha_revision")));
+                datos.add(new Reporte(rs.getInt("id"), rs.getString("tec"), rs.getString("placa"), 
+                                     rs.getString("tipo"), rs.getString("ope"), rs.getString("fecha_revision")));
             }
-        } catch (SQLException e) {
-            txtResultado.setText("Error en Reporte MySQL: " + e.getMessage());
-        }
+            tablaGenerica.setItems(datos);
+        } catch (SQLException ex) { System.out.println(ex.getMessage()); }
     }
 
-    // Método auxiliar para evitar repetir código en A y B
-    private void ejecutarConsulta(String sql, String titulo) {
-        try (Connection con = DriverManager.getConnection(URL, USER, PASS);
-             PreparedStatement ps = con.prepareStatement(sql);
-             ResultSet rs = ps.executeQuery()) {
-            
-            txtResultado.appendText(titulo + "\n\n");
-            ResultSetMetaData metaData = rs.getMetaData();
-            int columnCount = metaData.getColumnCount();
-
-            while (rs.next()) {
-                for (int i = 1; i <= columnCount; i++) {
-                    txtResultado.appendText(metaData.getColumnName(i) + ": " + rs.getString(i) + "  ");
-                }
-                txtResultado.appendText("\n");
-            }
-        } catch (SQLException e) {
-            txtResultado.setText("Error MySQL: " + e.getMessage());
-        }
-    }
-
-    public static void main(String[] args) {
-        launch();
-    }
+    public static void main(String[] args) { launch(args); }
 }
